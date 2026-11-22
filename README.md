@@ -41,8 +41,9 @@ Aroma is a full-stack multi-tenant product catalogue management platform where i
 
 | Role | Merchant Store | Email | Password |
 | :--- | :--- | :--- | :--- |
-| **Merchant 1** | Aroma Store A | `berarahul@gmail.com` | `Password123!` |
-| **Merchant 2** | Aroma Store B | `merchant2@aroma.com` | `Password123!` |
+| **Merchant 1** | Aroma Store A | `merchantA@aroma.com` | `Password123` |
+| **Merchant 2** | Aroma Store B | `merchantB@aroma.com` | `Password123` |
+| **Merchant 3** | Aroma Store C | `berarahul@gmail.com` | `Rahul753` |
 
 > **Tip:** You can also register new merchant accounts directly from the sign-in screen or run `node seed.js` inside `backend/` to populate demo data.
 
