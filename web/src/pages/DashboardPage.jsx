@@ -3,9 +3,30 @@ import { apiRequest } from "../api";
 
 const SERVER_ORIGIN = "http://localhost:8080";
 
+function inferSubcategory(product) {
+  if (product.subcategory && product.subcategory.trim()) {
+    return product.subcategory.trim();
+  }
+  const name = (product.name || "").toLowerCase();
+  const cat = (product.category || "General").trim();
+
+  if (name.includes("chair")) return "Office Chairs";
+  if (name.includes("desk") || name.includes("table")) return "Desks & Tables";
+  if (name.includes("sofa") || name.includes("couch")) return "Lounge & Sofas";
+  if (name.includes("lamp") || name.includes("light")) return "Lighting";
+  if (name.includes("candle")) return "Soy & Wax Candles";
+  if (name.includes("oil") || name.includes("elixir")) return "Pure & Diffuser Oils";
+  if (name.includes("mist") || name.includes("spray")) return "Room Mists & Sprays";
+  if (name.includes("diffuser")) return "Reed & Aroma Diffusers";
+  if (name.includes("incense")) return "Incense & Cones";
+  return `${cat} Collection`;
+}
+
 export default function DashboardPage({ token, merchant, onLogout, showToast }) {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedSubcategory, setSelectedSubcategory] = useState("All");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -21,6 +42,7 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
   const [editingProduct, setEditingProduct] = useState(null);
   const [editName, setEditName] = useState("");
   const [editCategory, setEditCategory] = useState("");
+  const [editSubcategory, setEditSubcategory] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editStock, setEditStock] = useState("");
   const [editPhotoFile, setEditPhotoFile] = useState(null);
@@ -34,7 +56,7 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
     try {
       const params = new URLSearchParams({
         page: String(page),
-        limit: "15",
+        limit: "50",
         search,
       });
       const data = await apiRequest(`/products?${params.toString()}`, {}, token);
@@ -53,6 +75,36 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
+
+  const categories = [
+    "All",
+    ...Array.from(
+      new Set(products.map((p) => (p.category || "").trim()).filter(Boolean))
+    ).sort((a, b) => a.localeCompare(b)),
+  ];
+
+  const categoryScopedProducts =
+    selectedCategory === "All"
+      ? products
+      : products.filter(
+          (p) =>
+            (p.category || "").trim().toLowerCase() ===
+            selectedCategory.trim().toLowerCase()
+        );
+
+  const subcategories = [
+    "All",
+    ...Array.from(new Set(categoryScopedProducts.map(inferSubcategory))).sort(
+      (a, b) => a.localeCompare(b)
+    ),
+  ];
+
+  const filteredProducts =
+    selectedSubcategory === "All"
+      ? categoryScopedProducts
+      : categoryScopedProducts.filter(
+          (p) => inferSubcategory(p) === selectedSubcategory
+        );
 
   const openBulkModal = () => {
     setBulkModalOpen(true);
@@ -86,6 +138,8 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
         token
       );
       setReport(data);
+      setSelectedCategory("All");
+      setSelectedSubcategory("All");
       setPage(1);
       closeBulkModal();
       showToast(
@@ -103,6 +157,7 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
     setEditingProduct(product);
     setEditName(product.name ?? "");
     setEditCategory(product.category ?? "");
+    setEditSubcategory(product.subcategory ?? inferSubcategory(product));
     setEditPrice(String(product.price ?? ""));
     setEditStock(String(product.stock ?? ""));
     setEditPhotoFile(null);
@@ -119,6 +174,7 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
       URL.revokeObjectURL(editPhotoPreview);
     }
     setEditingProduct(null);
+    setEditSubcategory("");
     setEditPhotoFile(null);
     setEditPhotoPreview("");
     if (photoInputRef.current) {
@@ -149,6 +205,7 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
 
     const trimmedName = editName.trim();
     const trimmedCategory = editCategory.trim();
+    const trimmedSubcategory = editSubcategory.trim();
     const numericPrice = Number(editPrice);
     const numericStock = Number(editStock);
 
@@ -170,6 +227,7 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
       const formData = new FormData();
       formData.append("name", trimmedName);
       formData.append("category", trimmedCategory);
+      formData.append("subcategory", trimmedSubcategory);
       formData.append("price", String(numericPrice));
       formData.append("stock", String(numericStock));
       if (editPhotoFile) {
@@ -193,6 +251,8 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
                 ...(updatedDoc && updatedDoc._id ? updatedDoc : {}),
                 name: updatedDoc?.name ?? trimmedName,
                 category: updatedDoc?.category ?? trimmedCategory,
+                subcategory:
+                  updatedDoc?.subcategory ?? trimmedSubcategory,
                 price: updatedDoc?.price ?? numericPrice,
                 stock: updatedDoc?.stock ?? numericStock,
                 imageUrl: updatedDoc?.imageUrl ?? item.imageUrl,
@@ -254,7 +314,7 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
     URL.revokeObjectURL(url);
   };
 
-  const pageStockSum = products.reduce(
+  const pageStockSum = filteredProducts.reduce(
     (acc, item) => acc + Number(item.stock || 0),
     0
   );
@@ -344,7 +404,7 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
               textTransform: "uppercase",
             }}
           >
-            Units on Current Page
+            Filtered Stock Units
           </div>
           <div style={{ fontSize: "28px", fontWeight: 800, marginTop: "6px" }}>
             {pageStockSum}
@@ -371,7 +431,7 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
         </div>
       </div>
 
-      {/* Last Import Summary Banner (if a CSV was just imported) */}
+      {/* Last Import Summary Banner */}
       {report && (
         <div className="card" style={{ padding: "18px 24px", marginBottom: "20px" }}>
           <div
@@ -458,55 +518,121 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
         </div>
       )}
 
-      {/* Product Table */}
+      {/* Product Table with Category & Subcategory Filters */}
       <div className="card" style={{ overflow: "hidden" }}>
         <div
           style={{
             padding: "18px 24px",
             borderBottom: "1px solid #e2e8f0",
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
+            flexDirection: "column",
             gap: "12px",
           }}
         >
           <div
             style={{
               display: "flex",
-              gap: "8px",
+              justifyContent: "space-between",
               alignItems: "center",
-              flex: 1,
-              maxWidth: "430px",
+              flexWrap: "wrap",
+              gap: "12px",
             }}
           >
-            <input
-              className="input"
-              type="text"
-              placeholder="Search catalogue by SKU or product name..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                alignItems: "center",
+                flex: 1,
+                maxWidth: "430px",
               }}
-            />
-            {search && (
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => {
-                  setSearch("");
+            >
+              <input
+                className="input"
+                type="text"
+                placeholder="Search catalogue by SKU or product name..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
                   setPage(1);
                 }}
-              >
-                Clear
-              </button>
-            )}
+              />
+              {search && (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setSearch("");
+                    setPage(1);
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            <span style={{ fontSize: "13px", color: "#64748b" }}>
+              Showing <strong>{filteredProducts.length}</strong> of{" "}
+              <strong>{total}</strong> products
+            </span>
           </div>
-          <span style={{ fontSize: "13px", color: "#64748b" }}>
-            Showing <strong>{products.length}</strong> of <strong>{total}</strong>{" "}
-            products
-          </span>
+
+          {/* Category Filter Pills */}
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
+            <span style={{ fontSize: "12px", fontWeight: 700, color: "#64748b" }}>
+              CATEGORY:
+            </span>
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                className={`btn ${
+                  selectedCategory === cat ? "btn-accent" : "btn-ghost"
+                }`}
+                style={{ padding: "5px 12px", fontSize: "12.5px" }}
+                onClick={() => {
+                  setSelectedCategory(cat);
+                  setSelectedSubcategory("All");
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Subcategory Filter Pills */}
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
+            <span style={{ fontSize: "12px", fontWeight: 700, color: "#64748b" }}>
+              SUBCATEGORY:
+            </span>
+            {subcategories.map((sub) => (
+              <button
+                key={sub}
+                type="button"
+                className={`badge ${
+                  selectedSubcategory === sub ? "badge-indigo" : "badge-slate"
+                }`}
+                style={{ border: "none", cursor: "pointer", padding: "5px 11px" }}
+                onClick={() => setSelectedSubcategory(sub)}
+              >
+                {sub}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div style={{ overflowX: "auto" }}>
@@ -517,14 +643,15 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
                 <th>SKU</th>
                 <th>Product Name</th>
                 <th>Category</th>
+                <th>Subcategory</th>
                 <th>Price (₹)</th>
                 <th>Stock</th>
                 <th style={{ textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {products.length > 0 ? (
-                products.map((p) => {
+              {filteredProducts.length > 0 ? (
+                filteredProducts.map((p) => {
                   const cacheKey = p.updatedAt
                     ? `?v=${encodeURIComponent(p.updatedAt)}`
                     : "";
@@ -557,6 +684,9 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
                       </td>
                       <td>
                         <span className="badge badge-slate">{p.category}</span>
+                      </td>
+                      <td style={{ fontSize: "12.5px", color: "#475569" }}>
+                        {inferSubcategory(p)}
                       </td>
                       <td>₹{Number(p.price).toFixed(2)}</td>
                       <td>
@@ -594,7 +724,7 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
               ) : (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     style={{
                       textAlign: "center",
                       padding: "42px 20px",
@@ -608,11 +738,11 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
                         marginBottom: "4px",
                       }}
                     >
-                      No products in your catalogue yet
+                      No products match the selected filter
                     </div>
                     <div style={{ fontSize: "13px" }}>
-                      Click <strong>Bulk CSV Import</strong> above to upload your
-                      products.
+                      Switch Category or Subcategory above, or click{" "}
+                      <strong>Bulk CSV Import</strong> to upload products.
                     </div>
                   </td>
                 </tr>
@@ -690,7 +820,14 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
                 gap: "16px",
               }}
             >
-              <p style={{ margin: 0, fontSize: "13.5px", color: "#64748b", lineHeight: 1.5 }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "13.5px",
+                  color: "#64748b",
+                  lineHeight: 1.5,
+                }}
+              >
                 Columns: <code>sku,name,category,price,stock</code>. Existing SKUs
                 for your merchant update in place; duplicate SKUs in the same file
                 are rejected with row numbers.
@@ -803,7 +940,6 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
                 gap: "14px",
               }}
             >
-              {/* Photo Upload & Preview */}
               <div
                 style={{
                   display: "flex",
@@ -908,25 +1044,53 @@ export default function DashboardPage({ token, merchant, onLogout, showToast }) 
                 />
               </div>
 
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "12.5px",
-                    fontWeight: 600,
-                    color: "#334155",
-                    marginBottom: "6px",
-                  }}
-                >
-                  Category
-                </label>
-                <input
-                  className="input"
-                  type="text"
-                  value={editCategory}
-                  onChange={(e) => setEditCategory(e.target.value)}
-                  required
-                />
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "12px",
+                }}
+              >
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      color: "#334155",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    Category
+                  </label>
+                  <input
+                    className="input"
+                    type="text"
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      color: "#334155",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    Subcategory
+                  </label>
+                  <input
+                    className="input"
+                    type="text"
+                    value={editSubcategory}
+                    onChange={(e) => setEditSubcategory(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div

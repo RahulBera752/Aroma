@@ -1,9 +1,11 @@
 import React, { useState, useCallback } from "react";
 import Navbar from "./components/Navbar";
+import CustomerAuthModal from "./components/CustomerAuthModal";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import DashboardPage from "./pages/DashboardPage";
+import CustomerCataloguePage from "./pages/CustomerCataloguePage";
 import "./style.css";
 
 export default function App() {
@@ -11,8 +13,21 @@ export default function App() {
   const [merchant, setMerchant] = useState(() =>
     JSON.parse(localStorage.getItem("merchant") || "null")
   );
+
+  const [customerToken, setCustomerToken] = useState(
+    () => localStorage.getItem("customerToken") || ""
+  );
+  const [customerUser, setCustomerUser] = useState(() =>
+    JSON.parse(localStorage.getItem("customerUser") || "null")
+  );
+  const [customerAuthOpen, setCustomerAuthOpen] = useState(false);
+
   const [view, setView] = useState(() =>
-    localStorage.getItem("token") ? "dashboard" : "landing"
+    localStorage.getItem("token")
+      ? "dashboard"
+      : localStorage.getItem("customerToken")
+      ? "customer"
+      : "landing"
   );
   const [toast, setToast] = useState(null);
 
@@ -27,11 +42,27 @@ export default function App() {
   };
 
   const handleAuthSuccess = (newToken, newMerchant) => {
+    if (newMerchant?.role === "customer") {
+      localStorage.setItem("customerToken", newToken);
+      localStorage.setItem("customerUser", JSON.stringify(newMerchant));
+      setCustomerToken(newToken);
+      setCustomerUser(newMerchant);
+      setView("customer");
+      return;
+    }
     localStorage.setItem("token", newToken);
     localStorage.setItem("merchant", JSON.stringify(newMerchant));
     setToken(newToken);
     setMerchant(newMerchant);
     setView("dashboard");
+  };
+
+  const handleCustomerAuthSuccess = (newToken, newCustomer) => {
+    localStorage.setItem("customerToken", newToken);
+    localStorage.setItem("customerUser", JSON.stringify(newCustomer));
+    setCustomerToken(newToken);
+    setCustomerUser(newCustomer);
+    setView("customer");
   };
 
   const handleLogout = useCallback(() => {
@@ -40,7 +71,15 @@ export default function App() {
     setToken("");
     setMerchant(null);
     setView("landing");
-    showToast("Signed out successfully");
+    showToast("Merchant signed out successfully");
+  }, [showToast]);
+
+  const handleCustomerLogout = useCallback(() => {
+    localStorage.removeItem("customerToken");
+    localStorage.removeItem("customerUser");
+    setCustomerToken("");
+    setCustomerUser(null);
+    showToast("Customer signed out successfully");
   }, [showToast]);
 
   return (
@@ -58,11 +97,30 @@ export default function App() {
       <Navbar
         token={token}
         merchant={merchant}
+        customerToken={customerToken}
+        customerUser={customerUser}
         onNavigate={navigate}
         onLogout={handleLogout}
+        onCustomerLogout={handleCustomerLogout}
+        onOpenCustomerAuth={() => setCustomerAuthOpen(true)}
       />
 
-      {token && view === "dashboard" ? (
+      <CustomerAuthModal
+        isOpen={customerAuthOpen}
+        onClose={() => setCustomerAuthOpen(false)}
+        onCustomerAuthSuccess={handleCustomerAuthSuccess}
+        showToast={showToast}
+      />
+
+      {view === "customer" ? (
+        <CustomerCataloguePage
+          customerToken={customerToken}
+          customerUser={customerUser}
+          onOpenCustomerAuth={() => setCustomerAuthOpen(true)}
+          onCustomerLogout={handleCustomerLogout}
+          showToast={showToast}
+        />
+      ) : token && view === "dashboard" ? (
         <DashboardPage
           token={token}
           merchant={merchant}

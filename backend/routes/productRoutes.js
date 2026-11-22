@@ -4,7 +4,13 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import authMiddleware from "../middleware/authMiddleware.js";
-import { getProducts, updateProduct, deleteProduct } from "../controllers/productController.js";
+import {
+  getProducts,
+  getPublicProducts,
+  orderProduct,
+  updateProduct,
+  deleteProduct,
+} from "../controllers/productController.js";
 import { importCsv } from "../controllers/importController.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -48,6 +54,11 @@ const handleImageUpload = (req, res, next) => {
   });
 };
 
+// Public customer routes
+router.get("/public", getPublicProducts);
+router.post("/:id/order", orderProduct);
+
+// Authenticated merchant routes
 router.get("/", authMiddleware, getProducts);
 router.patch("/:id", authMiddleware, handleImageUpload, updateProduct);
 router.delete("/:id", authMiddleware, deleteProduct);

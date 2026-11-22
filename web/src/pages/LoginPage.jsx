@@ -2,10 +2,13 @@ import React, { useState } from "react";
 import { apiRequest } from "../api";
 
 export default function LoginPage({ onNavigate, onAuthSuccess, showToast }) {
+  const [role, setRole] = useState("merchant"); // "merchant" | "customer"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const isCustomer = role === "customer";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,10 +18,23 @@ export default function LoginPage({ onNavigate, onAuthSuccess, showToast }) {
       const data = await apiRequest("/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          role,
+        }),
       });
-      onAuthSuccess(data.token, data.merchant);
-      showToast(`Signed in as ${data.merchant.name}`);
+
+      const account = data.merchant ||
+        data.user || {
+          name: email.trim().split("@")[0],
+          email: email.trim(),
+          role: data.role || role,
+        };
+      const resolvedRole = account.role || data.role || role;
+
+      onAuthSuccess(data.token, { ...account, role: resolvedRole });
+      showToast(`Signed in as ${account.name}`);
     } catch (err) {
       setError(err.message || "Invalid credentials");
     } finally {
@@ -58,7 +74,7 @@ export default function LoginPage({ onNavigate, onAuthSuccess, showToast }) {
                 marginBottom: "18px",
               }}
             >
-              MERCHANT WORKSPACE
+              {isCustomer ? "CUSTOMER STOREFRONT" : "MERCHANT WORKSPACE"}
             </span>
             <h2
               style={{
@@ -68,7 +84,9 @@ export default function LoginPage({ onNavigate, onAuthSuccess, showToast }) {
                 letterSpacing: "-0.02em",
               }}
             >
-              Welcome back to your merchant command center.
+              {isCustomer
+                ? "Welcome back to the Aroma customer store."
+                : "Welcome back to your merchant command center."}
             </h2>
             <p
               style={{
@@ -78,8 +96,9 @@ export default function LoginPage({ onNavigate, onAuthSuccess, showToast }) {
                 lineHeight: 1.6,
               }}
             >
-              Sign in with your account credentials to access your private
-              product catalogue, bulk CSV uploader, and live inventory controls.
+              {isCustomer
+                ? "Sign in with your customer account to browse categories and subcategories, view product photos, and order items."
+                : "Sign in with your account credentials to access your private product catalogue, bulk CSV uploader, and live inventory controls."}
             </p>
           </div>
           <div
@@ -91,8 +110,9 @@ export default function LoginPage({ onNavigate, onAuthSuccess, showToast }) {
               color: "#cbd5e1",
             }}
           >
-            "Each merchant account keeps its own isolated products, stock counts,
-            and CSV imports."
+            {isCustomer
+              ? '"Browse by category, inspect item photos, and place orders directly."'
+              : '"Each merchant account keeps its own isolated products, stock counts, and CSV imports."'}
           </div>
         </div>
 
@@ -105,7 +125,7 @@ export default function LoginPage({ onNavigate, onAuthSuccess, showToast }) {
               background: "#f1f5f9",
               padding: "4px",
               borderRadius: "10px",
-              marginBottom: "24px",
+              marginBottom: "16px",
             }}
           >
             <button
@@ -129,7 +149,50 @@ export default function LoginPage({ onNavigate, onAuthSuccess, showToast }) {
             </button>
           </div>
 
-          <h1 style={{ margin: "0 0 6px", fontSize: "22px" }}>Sign In</h1>
+          {/* Account Type Switcher: Merchant vs Customer */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "8px",
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              padding: "4px",
+              borderRadius: "10px",
+              marginBottom: "20px",
+            }}
+          >
+            <button
+              type="button"
+              className="btn"
+              style={{
+                background: !isCustomer ? "#4f46e5" : "transparent",
+                color: !isCustomer ? "#ffffff" : "#475569",
+                fontWeight: 600,
+                fontSize: "13px",
+              }}
+              onClick={() => setRole("merchant")}
+            >
+              Merchant Account
+            </button>
+            <button
+              type="button"
+              className="btn"
+              style={{
+                background: isCustomer ? "#4f46e5" : "transparent",
+                color: isCustomer ? "#ffffff" : "#475569",
+                fontWeight: 600,
+                fontSize: "13px",
+              }}
+              onClick={() => setRole("customer")}
+            >
+              Customer Account
+            </button>
+          </div>
+
+          <h1 style={{ margin: "0 0 6px", fontSize: "22px" }}>
+            {isCustomer ? "Customer Sign In" : "Merchant Sign In"}
+          </h1>
           <p
             style={{
               margin: "0 0 20px",
@@ -137,7 +200,9 @@ export default function LoginPage({ onNavigate, onAuthSuccess, showToast }) {
               color: "#64748b",
             }}
           >
-            Enter your email and password to open your merchant store.
+            {isCustomer
+              ? "Enter your email and password to browse and order products."
+              : "Enter your email and password to open your merchant store."}
           </p>
 
           <form
@@ -154,12 +219,12 @@ export default function LoginPage({ onNavigate, onAuthSuccess, showToast }) {
                   marginBottom: "6px",
                 }}
               >
-                Work Email
+                {isCustomer ? "Customer Email" : "Work Email"}
               </label>
               <input
                 className="input"
                 type="email"
-                placeholder="you@company.com"
+                placeholder={isCustomer ? "customer@example.com" : "you@company.com"}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -207,7 +272,11 @@ export default function LoginPage({ onNavigate, onAuthSuccess, showToast }) {
               style={{ padding: "12px 16px", fontSize: "14.5px", marginTop: "4px" }}
               disabled={loading}
             >
-              {loading ? "Signing In..." : "Sign In to Dashboard"}
+              {loading
+                ? "Signing In..."
+                : isCustomer
+                ? "Sign In to Customer Store"
+                : "Sign In to Dashboard"}
             </button>
           </form>
         </div>

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { apiRequest } from "../api";
 
 export default function RegisterPage({ onNavigate, onAuthSuccess, showToast }) {
+  const [role, setRole] = useState("merchant"); // "merchant" | "customer"
   const [fullName, setFullName] = useState("");
   const [storeName, setStoreName] = useState("");
   const [email, setEmail] = useState("");
@@ -9,15 +10,18 @@ export default function RegisterPage({ onNavigate, onAuthSuccess, showToast }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const isCustomer = role === "customer";
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const combinedName =
-      storeName.trim() && fullName.trim()
-        ? `${storeName.trim()} (${fullName.trim()})`
-        : storeName.trim() || fullName.trim();
+    const combinedName = isCustomer
+      ? fullName.trim()
+      : storeName.trim() && fullName.trim()
+      ? `${storeName.trim()} (${fullName.trim()})`
+      : storeName.trim() || fullName.trim();
 
     try {
       const data = await apiRequest("/auth/register", {
@@ -27,10 +31,19 @@ export default function RegisterPage({ onNavigate, onAuthSuccess, showToast }) {
           name: combinedName,
           email: email.trim(),
           password,
+          role,
         }),
       });
-      onAuthSuccess(data.token, data.merchant);
-      showToast(`Account created! Welcome, ${data.merchant.name}`);
+
+      const account = data.merchant ||
+        data.user || {
+          name: combinedName,
+          email: email.trim(),
+          role,
+        };
+
+      onAuthSuccess(data.token, { ...account, role: account.role || role });
+      showToast(`Account created! Welcome, ${account.name}`);
     } catch (err) {
       setError(err.message || "Registration failed");
     } finally {
@@ -70,7 +83,7 @@ export default function RegisterPage({ onNavigate, onAuthSuccess, showToast }) {
                 marginBottom: "18px",
               }}
             >
-              NEW STOREFRONT ONBOARDING
+              {isCustomer ? "NEW CUSTOMER ONBOARDING" : "NEW STOREFRONT ONBOARDING"}
             </span>
             <h2
               style={{
@@ -80,7 +93,9 @@ export default function RegisterPage({ onNavigate, onAuthSuccess, showToast }) {
                 letterSpacing: "-0.02em",
               }}
             >
-              Create your merchant account in seconds.
+              {isCustomer
+                ? "Create your customer account in seconds."
+                : "Create your merchant account in seconds."}
             </h2>
             <p
               style={{
@@ -90,8 +105,9 @@ export default function RegisterPage({ onNavigate, onAuthSuccess, showToast }) {
                 lineHeight: 1.6,
               }}
             >
-              Enter your name, store details, email, and password to set up your
-              isolated product catalogue.
+              {isCustomer
+                ? "Enter your name, email, and password to browse product catalogues and place orders."
+                : "Enter your name, store details, email, and password to set up your isolated product catalogue."}
             </p>
           </div>
           <div
@@ -103,7 +119,9 @@ export default function RegisterPage({ onNavigate, onAuthSuccess, showToast }) {
               color: "#cbd5e1",
             }}
           >
-            "Instant setup with zero SKU collisions across storefronts."
+            {isCustomer
+              ? '"Browse categories and subcategories, view live prices, and order items."'
+              : '"Instant setup with zero SKU collisions across storefronts."'}
           </div>
         </div>
 
@@ -116,7 +134,7 @@ export default function RegisterPage({ onNavigate, onAuthSuccess, showToast }) {
               background: "#f1f5f9",
               padding: "4px",
               borderRadius: "10px",
-              marginBottom: "24px",
+              marginBottom: "16px",
             }}
           >
             <button
@@ -140,8 +158,49 @@ export default function RegisterPage({ onNavigate, onAuthSuccess, showToast }) {
             </button>
           </div>
 
+          {/* Account Type Switcher: Merchant vs Customer */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "8px",
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              padding: "4px",
+              borderRadius: "10px",
+              marginBottom: "20px",
+            }}
+          >
+            <button
+              type="button"
+              className="btn"
+              style={{
+                background: !isCustomer ? "#4f46e5" : "transparent",
+                color: !isCustomer ? "#ffffff" : "#475569",
+                fontWeight: 600,
+                fontSize: "13px",
+              }}
+              onClick={() => setRole("merchant")}
+            >
+              Merchant Account
+            </button>
+            <button
+              type="button"
+              className="btn"
+              style={{
+                background: isCustomer ? "#4f46e5" : "transparent",
+                color: isCustomer ? "#ffffff" : "#475569",
+                fontWeight: 600,
+                fontSize: "13px",
+              }}
+              onClick={() => setRole("customer")}
+            >
+              Customer Account
+            </button>
+          </div>
+
           <h1 style={{ margin: "0 0 6px", fontSize: "22px" }}>
-            Create Account (Sign Up)
+            {isCustomer ? "Create Customer Account" : "Create Account (Sign Up)"}
           </h1>
           <p
             style={{
@@ -150,7 +209,9 @@ export default function RegisterPage({ onNavigate, onAuthSuccess, showToast }) {
               color: "#64748b",
             }}
           >
-            Fill in your name, store name, email, and password to get started.
+            {isCustomer
+              ? "Fill in your name, email, and password to start shopping."
+              : "Fill in your name, store name, email, and password to get started."}
           </p>
 
           <form
@@ -179,27 +240,29 @@ export default function RegisterPage({ onNavigate, onAuthSuccess, showToast }) {
               />
             </div>
 
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "12.5px",
-                  fontWeight: 600,
-                  color: "#334155",
-                  marginBottom: "6px",
-                }}
-              >
-                Store / Business Name
-              </label>
-              <input
-                className="input"
-                type="text"
-                placeholder="e.g. Aroma Botanica"
-                value={storeName}
-                onChange={(e) => setStoreName(e.target.value)}
-                required
-              />
-            </div>
+            {!isCustomer && (
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    color: "#334155",
+                    marginBottom: "6px",
+                  }}
+                >
+                  Store / Business Name
+                </label>
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="e.g. Aroma Botanica"
+                  value={storeName}
+                  onChange={(e) => setStoreName(e.target.value)}
+                  required
+                />
+              </div>
+            )}
 
             <div>
               <label
@@ -216,7 +279,7 @@ export default function RegisterPage({ onNavigate, onAuthSuccess, showToast }) {
               <input
                 className="input"
                 type="email"
-                placeholder="you@company.com"
+                placeholder={isCustomer ? "customer@example.com" : "you@company.com"}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -265,7 +328,11 @@ export default function RegisterPage({ onNavigate, onAuthSuccess, showToast }) {
               style={{ padding: "12px 16px", fontSize: "14.5px", marginTop: "4px" }}
               disabled={loading}
             >
-              {loading ? "Creating Account..." : "Sign Up & Create Account"}
+              {loading
+                ? "Creating Account..."
+                : isCustomer
+                ? "Sign Up & Create Customer Account"
+                : "Sign Up & Create Account"}
             </button>
           </form>
         </div>
